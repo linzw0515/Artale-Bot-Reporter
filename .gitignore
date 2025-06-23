@@ -183,7 +183,6 @@ htmlcov/
 
 # Logs
 *.log
-.pytype/
 
 # Cython debug symbols
 cython_debug/
@@ -220,4 +219,3 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
->>>>>>> 1e13b81d3d06a9e3c3df1d84c711c9fb74083692
