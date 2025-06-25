@@ -5,11 +5,12 @@
 
 import tkinter as tk
 from tkinter import scrolledtext, ttk, messagebox
-from scapy.all import AsyncSniffer, TCP
+from scapy.all import AsyncSniffer, TCP, get_working_ifaces
 from typing import List, Dict
 from config import Config
 from data_manager import DataManager
 from packet_processor import PacketProcessor
+
 
 
 class PlayerMonitorTab:
@@ -22,12 +23,14 @@ class PlayerMonitorTab:
         self.my_name = ""
         self.my_current_map = ""
         self.sniffer = None
+        self.iface_map = {}
+        self.iface_displayname = []
+        self.iface_list = self._create_iface_list()
         
         # 載入上次的角色名稱
         self.last_character_name = self.data_manager.load_user_config()
         
         self._create_widgets()
-        self._start_packet_monitoring()
     
     def _create_widgets(self):
         """創建玩家監控UI元件"""
@@ -43,7 +46,14 @@ class PlayerMonitorTab:
         self.name_var = tk.StringVar(value=self.last_character_name)
         name_entry = ttk.Entry(name_frame, textvariable=self.name_var, font=('Arial', 12))
         name_entry.pack(fill='x', pady=(5, 10))
-        
+        # 👉 加入：網卡選擇下拉選單
+        ttk.Label(name_frame, text="請選擇網卡介面：").pack(anchor='w')
+        self.iface_var = tk.StringVar()
+        self.iface_combo = ttk.Combobox(name_frame, textvariable=self.iface_var,values=self.iface_displayname, state='readonly')
+        self.iface_combo.pack(fill='x', pady=(5, 10))
+        if self.iface_displayname:
+            #預設抓第一個
+            self.iface_combo.current(0)
         ttk.Button(name_frame, text="🔍 開始監控", command=self._set_character_name).pack(anchor='e')
         
         # 狀態顯示
@@ -131,18 +141,33 @@ class PlayerMonitorTab:
         
         self.log = scrolledtext.ScrolledText(log_frame, state='disabled', wrap='word', height=6)
         self.log.pack(fill='both', expand=True)
+        
+    def _create_iface_list(self):
+        """取得所有網卡並加入下拉選單"""
+        iface_names = []
+        for iface in get_working_ifaces():
+            iface_names.append(iface.name)
+            print(f"{iface.name} | {iface.description} | {iface.guid}")
+            self.iface_map[iface.name] = "\\Device\\NPF_"+iface.guid
+        self.iface_displayname = iface_names
     
     def _start_packet_monitoring(self):
         """開始封包監控"""
+        selected_iface_name = self.iface_var.get()
+        iface_guid = self.iface_map.get(selected_iface_name)
+        if self.sniffer and self.sniffer.thread and self.sniffer.thread.is_alive():
+            self.log_message(f"已停止 封包監控 監控網卡:{selected_iface_name}|{iface_guid}")
+            self.sniffer.stop()
         try:
             self.sniffer = AsyncSniffer(
+                iface=iface_guid,
                 filter=f'tcp port {Config.DEFAULT_PORT}',
                 prn=self._process_packet,
                 store=False
             )
             self.sniffer.start()
             self._set_status_light(True)
-            self.log_message(f"🟢 封包監控已啟動 (TCP {Config.DEFAULT_PORT})")
+            self.log_message(f"🟢 封包監控已啟動 (TCP {Config.DEFAULT_PORT}) 監控網卡:{selected_iface_name}|{iface_guid}")
         except Exception as e:
             self.log_message(f"❌ 啟動監控失敗：{e}")
             messagebox.showerror("錯誤", f"無法啟動封包監控：{e}")
@@ -164,6 +189,7 @@ class PlayerMonitorTab:
             messagebox.showwarning("警告", "請輸入角色名稱")
             return
         
+        self._start_packet_monitoring()
         self.my_name = name
         self.data_manager.save_user_config(name)
         self.status_label.config(text=f"正在監控角色：{name}", foreground='blue')
