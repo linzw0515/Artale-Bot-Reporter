@@ -36,7 +36,7 @@ def build_exe():
         '--hidden-import=tkinter',      # Ensure tkinter is included
         '--hidden-import=scapy.all',    # Ensure scapy is included
         '--hidden-import=pygetwindow',  # Ensure pygetwindow is included
-        'Artale_Bot_Reporter.py'        # Main script
+        'main.py'        # Main script
     ]
     
     # Check if icon exists, if not remove from command
